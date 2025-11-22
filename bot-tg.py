@@ -162,7 +162,7 @@ def schedule_daily(app: Application):
     sched.add_job(lambda: asyncio.create_task(send_daily(app)), CronTrigger(hour=DAILY_HOUR, minute=0))
     sched.start()
 
-async def main():
+def main():
     start_keepalive_http_server()
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -170,7 +170,7 @@ async def main():
     app.add_handler(CommandHandler("id", chat_id_cmd))
     schedule_daily(app)
     logger.info("Bot en marxa… (Web Service)")
-    await app.run_polling(close_loop=False)
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
