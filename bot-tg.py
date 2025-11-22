@@ -1,4 +1,5 @@
 # random-mcap-telegram-bot.py (versió Render Web Service Free)
+
 import os
 import asyncio
 import logging
@@ -149,6 +150,12 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = pick_random_coin_text()
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
+
+async def chat_id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    c = update.effective_chat
+    await update.message.reply_text(f"Chat ID: {c.id}
+Type: {c.type}")
+
 def schedule_daily(app: Application):
     sched = AsyncIOScheduler(timezone=TIMEZONE)
     sched.add_job(lambda: asyncio.create_task(send_daily(app)), CronTrigger(hour=DAILY_HOUR, minute=0))
@@ -159,10 +166,10 @@ async def main():
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("now", now))
+    app.add_handler(CommandHandler("id", chat_id_cmd))
     schedule_daily(app)
     logger.info("Bot en marxa… (Web Service)")
     await app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
