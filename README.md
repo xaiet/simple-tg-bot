@@ -1,6 +1,6 @@
 # README (Deploy a Render)
 # simple-tg-bot 
-1. Puja `random-mcap-telegram-bot.py`, `requirements.txt`, `render.yaml`, `.env.example` a GitHub.
+1. Puja `bot-tg.py`, `requirements.txt`, `render.yaml`, `.env.example` a GitHub.
 2. A Render → New → Web Service.
 3. Configura:
    - Build: `pip install -r requirements.txt`
