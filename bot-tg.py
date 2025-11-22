@@ -18,7 +18,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 # -----------------------------
 # Config
 # -----------------------------
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TIMEZONE = pytz.timezone("Europe/Madrid")
 DAILY_HOUR = int(os.getenv("DAILY_HOUR", 9))
 ALLOWED_CHAT_ID = os.getenv("ALLOWED_CHAT_ID")
@@ -35,6 +36,7 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 # -----------------------------
 # Keep-alive HTTP server (Render Free Web Service)
 # -----------------------------
+
 def start_keepalive_http_server():
     import threading, http.server, socketserver
     PORT = int(os.environ.get("PORT", 8080))
@@ -153,8 +155,7 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def chat_id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = update.effective_chat
-    await update.message.reply_text(f"Chat ID: {c.id}
-Type: {c.type}")
+    await update.message.reply_text(f"Chat ID: {c.id}\nType: {c.type}")
 
 def schedule_daily(app: Application):
     sched = AsyncIOScheduler(timezone=TIMEZONE)
