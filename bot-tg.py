@@ -153,8 +153,7 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def chat_id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = update.effective_chat
-    await update.message.reply_text(f"Chat ID: {c.id}
-Type: {c.type}")
+    await update.message.reply_text(f"Chat ID: {c.id}\nType: {c.type}")
 
 def schedule_daily(app: Application):
     sched = AsyncIOScheduler(timezone=TIMEZONE)
