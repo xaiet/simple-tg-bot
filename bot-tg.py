@@ -26,6 +26,12 @@ try:
 except ValueError:
     ALLOWED_CHAT_ID = 0
 
+def is_allowed(chat_id: int) -> bool:
+    # Si no hi ha restricció, permet tothom
+    if not ALLOWED_CHAT_ID:
+        return True
+    return chat_id == ALLOWED_CHAT_ID
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -79,18 +85,19 @@ def pick_random_coin_text(max_rank: int = 500):
 # Handlers
 # -----------------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    if ALLOWED_CHAT_ID and chat_id != ALLOWED_CHAT_ID:
-        logger.warning(f"Accés denegat des del chat {chat_id}")
+    chat = update.effective_chat
+    if not is_allowed(chat.id):
+        logger.warning(f"Accés denegat des del chat {chat.id}")
         return
     await update.message.reply_text(
-        "Bot actiu ✅ Envia /now o /now <rànquing> per veure una coin per Market Cap."
+        "Bot actiu ✅ Envia /now o /now <rànquing> per veure una coin per Market Cap.\n"
+        "Si hi ha més d'un bot al grup, usa /now@<NomDelTeuBot>."
     )
 
 async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    if ALLOWED_CHAT_ID and chat_id != ALLOWED_CHAT_ID:
-        logger.warning(f"Accés denegat des del chat {chat_id}")
+    chat = update.effective_chat
+    if not is_allowed(chat.id):
+        logger.warning(f"Accés denegat des del chat {chat.id}")
         return
 
     rank = None
@@ -98,7 +105,8 @@ async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             rank = int(context.args[0])
         except ValueError:
-            pass
+            rank = None
+
     try:
         if rank is None:
             msg = pick_random_coin_text()
@@ -114,9 +122,10 @@ async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {e}")
 
 async def id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # /id RESPON SEMPRE (sense filtre) per poder obtenir l'ID correcte del xat
     c = update.effective_chat
     msg = f"Chat ID: {c.id}\nType: {c.type}"
-    if c.title:
+    if getattr(c, "title", None):
         msg += f"\nNom del grup: {c.title}"
     await update.message.reply_text(msg)
 
