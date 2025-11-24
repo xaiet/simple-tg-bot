@@ -66,32 +66,34 @@ def _headers():
 
 
 def coingecko_get(path, params=None, retries=3):
-    """GET amb backoff exponencial i suport de Retry-After.
-    Lança RuntimeError si persisteix l'error 429 o altres HTTP errors.
-    """
+    """GET amb backoff exponencial i suport de Retry-After + detecció automàtica Demo/Pro."""
+    global COINGECKO_BASE  # per poder modificar el domini si cal
     url = f"{COINGECKO_BASE}{path}"
     params = params or {}
     for attempt in range(retries):
         r = requests.get(url, params=params, timeout=30, headers=_headers())
-        # Rate limit explícit
+        # --- Maneig d'errors especials CoinGecko ---
+        if r.status_code == 400 and "error_code" in r.text:
+            if "\"10010\"" in r.text:  # té clau Pro però va per domini públic
+                logger.warning("Detectada API Pro key: canviant a pro-api.coingecko.com")
+                COINGECKO_BASE = "https://pro-api.coingecko.com/api/v3"
+                time.sleep(1)
+                continue
+            if "\"10011\"" in r.text:  # clau Demo, ha d'anar per domini públic
+                logger.warning("Detectada Demo API key: canviant a api.coingecko.com")
+                COINGECKO_BASE = "https://api.coingecko.com/api/v3"
+                time.sleep(1)
+                continue
+        # --- Rate limit ---
         if r.status_code == 429:
-            # Respecta Retry-After si hi és
             retry_after = r.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    wait = max(1, int(retry_after))
-                except ValueError:
-                    wait = 2 ** attempt
-            else:
-                wait = 2 ** attempt
-            logger.warning(f"429 Too Many Requests a {path}. Esperant {wait}s i reintentant (attempt {attempt+1}/{retries})...")
+            wait = int(retry_after) if retry_after and retry_after.isdigit() else 2 ** attempt
+            logger.warning(f"429 Too Many Requests a {path}. Esperant {wait}s...")
             time.sleep(wait)
             continue
-        # Altres errors HTTP
         try:
             r.raise_for_status()
         except requests.HTTPError as e:
-            # Reintents suaus per 5xx
             if 500 <= r.status_code < 600 and attempt < retries - 1:
                 wait = 2 ** attempt
                 logger.warning(f"{r.status_code} a {path}. Esperant {wait}s...")
@@ -99,7 +101,7 @@ def coingecko_get(path, params=None, retries=3):
                 continue
             raise RuntimeError(f"CoinGecko error {r.status_code}: {r.text}") from e
         return r.json()
-    raise RuntimeError("CoinGecko rate limit persistent (429)")
+    raise RuntimeError("CoinGecko error persistent o 429 prolongat")
 
 
 # ---- API d'alt nivell ----
