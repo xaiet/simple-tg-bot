@@ -19,6 +19,14 @@ logger = logging.getLogger("cmc-bot")
 HEADERS = {"Accept": "application/json", "X-CMC_PRO_API_KEY": CMC_API_KEY}
 
 # -----------------------------
+# Access control
+# -----------------------------
+try:
+    ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID", "0"))
+except ValueError:
+    ALLOWED_CHAT_ID = 0
+
+# -----------------------------
 # Helpers
 # -----------------------------
 def fmt_usd(x):
@@ -71,9 +79,20 @@ def pick_random_coin_text(max_rank: int = 500):
 # Handlers
 # -----------------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot actiu ✅ Envia /now o /now <rànquing> per veure una coin per Market Cap.")
+    chat_id = update.effective_chat.id
+    if ALLOWED_CHAT_ID and chat_id != ALLOWED_CHAT_ID:
+        logger.warning(f"Accés denegat des del chat {chat_id}")
+        return
+    await update.message.reply_text(
+        "Bot actiu ✅ Envia /now o /now <rànquing> per veure una coin per Market Cap."
+    )
 
 async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if ALLOWED_CHAT_ID and chat_id != ALLOWED_CHAT_ID:
+        logger.warning(f"Accés denegat des del chat {chat_id}")
+        return
+
     rank = None
     if context.args:
         try:
@@ -96,7 +115,10 @@ async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = update.effective_chat
-    await update.message.reply_text(f"Chat ID: {c.id}\nType: {c.type}")
+    msg = f"Chat ID: {c.id}\nType: {c.type}"
+    if c.title:
+        msg += f"\nNom del grup: {c.title}"
+    await update.message.reply_text(msg)
 
 # -----------------------------
 # Main (Webhook)
