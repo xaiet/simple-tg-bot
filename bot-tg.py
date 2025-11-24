@@ -1,4 +1,5 @@
 # random-mcap-telegram-bot.py — Webhook mode (Render Free)
+# Optimized: fetch a single coin by market-cap rank instead of downloading top-500 each /now
 
 import os
 import logging
@@ -16,7 +17,6 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TIMEZONE = pytz.timezone("Europe/Madrid")
 
-# Si vols resposta diària automàtica, posa l'ID aquí, però com que tens un bot helper que envia /now, no cal.
 ALLOWED_CHAT_ID = os.getenv("ALLOWED_CHAT_ID")
 if ALLOWED_CHAT_ID:
     try:
@@ -47,18 +47,35 @@ def safe_pct(x):
 
 def coingecko_get(path, params=None):
     url = f"{COINGECKO_BASE}{path}"
-    r = requests.get(url, params=params or {}, timeout=30)
+    headers = {"Accept": "application/json", "User-Agent": "random-mcap-telegram-bot/1.0"}
+    r = requests.get(url, params=params or {}, timeout=30, headers=headers)
     r.raise_for_status()
     return r.json()
 
-def fetch_top_500_marketcap():
-    params = {"vs_currency": "usd", "order": "market_cap_desc", "per_page": 250, "price_change_percentage": "24h"}
-    data = coingecko_get("/coins/markets", {**params, "page": 1}) + coingecko_get("/coins/markets", {**params, "page": 2})
-    return data[:500]
+# Fetch exactly one coin by its market-cap rank using per_page=1 & page=rank
+# This avoids downloading all 500 coins.
+def fetch_coin_by_rank(rank: int):
+    if rank < 1:
+        raise ValueError("Rank must be >= 1")
+    params = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": 1,
+        "page": rank,
+        "price_change_percentage": "24h",
+        "sparkline": "false",
+        "locale": "en",
+    }
+    data = coingecko_get("/coins/markets", params)
+    if not data:
+        raise RuntimeError(f"No coin found at MC rank #{rank}")
+    return data[0]
+
 
 def fetch_coin_details(coin_id: str):
     params = {"localization": "false", "tickers": "false", "market_data": "true"}
     return coingecko_get(f"/coins/{coin_id}", params)
+
 
 def analyze_tokenomics(md):
     circ, total, maxs = md.get("circulating_supply"), md.get("total_supply"), md.get("max_supply")
@@ -89,6 +106,7 @@ def analyze_tokenomics(md):
     score = max(1, min(10, score))
     return {"score": score, "notes": notes, "circ_ratio": circ_ratio, "mcap_fdv": mcap_fdv, "vol_mcap": vol_mcap}
 
+
 def build_message(coin, details, rank):
     md = details.get("market_data") or {}
     ana = analyze_tokenomics(md)
@@ -106,30 +124,60 @@ def build_message(coin, details, rank):
     msg += f"\n\n**Puntuació:** {ana['score']}/10"
     return msg
 
-def pick_random_coin_text():
-    coins = fetch_top_500_marketcap()
-    X = random.randint(1, len(coins))
-    coin = coins[X - 1]
+
+# -----------------------------
+# Core selection
+# -----------------------------
+
+def pick_coin_text_by_rank(rank: int):
+    coin = fetch_coin_by_rank(rank)
     details = fetch_coin_details(coin['id'])
-    return build_message(coin, details, X)
+    return build_message(coin, details, rank)
+
+
+def pick_random_coin_text(max_rank: int = 500):
+    rank = random.randint(1, max_rank)
+    return pick_coin_text_by_rank(rank)
+
 
 # -----------------------------
 # Handlers
 # -----------------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot actiu! Envia /now per obtenir l'anàlisi.")
+    await update.message.reply_text("Bot actiu! Envia /now per obtenir l'anàlisi. Pots fer /now 123 per un rànquing concret.")
+
 
 async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = pick_random_coin_text()
-    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+    # Optional: /now <rank>
+    rank = None
+    if context.args:
+        try:
+            rank = int(context.args[0])
+        except ValueError:
+            rank = None
+    try:
+        if rank is not None:
+            if not (1 <= rank <= 500):
+                await update.message.reply_text("Indica un rànquing entre 1 i 500, ex: /now 73")
+                return
+            msg = pick_coin_text_by_rank(rank)
+        else:
+            msg = pick_random_coin_text(500)
+        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.exception("Error in /now")
+        await update.message.reply_text(f"S'ha produït un error: {e}")
+
 
 async def id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = update.effective_chat
     await update.message.reply_text(f"Chat ID: {c.id}\nType: {c.type}")
 
+
 # -----------------------------
 # Main (Webhook)
 # -----------------------------
+
 def main():
     if not TELEGRAM_BOT_TOKEN:
         raise SystemExit("Falta TELEGRAM_BOT_TOKEN")
@@ -150,14 +198,14 @@ def main():
     app.add_handler(CommandHandler("id", id_cmd))
 
     # Executa el servidor web i registra el webhook
-    # (run_webhook aixeca l'HTTP server i fa setWebhook per tu)
     app.run_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=url_path,
         webhook_url=webhook_url,
-        drop_pending_updates=True,  # neteja cua antiga
+        drop_pending_updates=True,
     )
+
 
 if __name__ == "__main__":
     main()
