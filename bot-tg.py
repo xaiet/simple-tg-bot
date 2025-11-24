@@ -198,17 +198,9 @@ def build_message(coin, details, rank):
         f"• **Vol 24h:** {fmt_usd(coin.get('total_volume'))}",
         f"• **Canvi 24h:** {safe_pct(coin.get('price_change_percentage_24h'))}",
     ]
-    msg = f"**🎲 Coin aleatòria #{rank} per MC (1–500)**
-" + "
-".join(lines)
-    msg += "
-
-**🔎 Anàlisi de tokenomics:**
-" + "
-".join([f"- {n}" for n in ana['notes']])
-    msg += f"
-
-**Puntuació:** {ana['score']}/10"
+    msg = f"**🎲 Coin aleatòria #{rank} per MC (1–500)**" + "".join(lines)
+    msg += "**🔎 Anàlisi de tokenomics:**" + "".join([f"- {n}" for n in ana['notes']])
+    msg += f"**Puntuació:** {ana['score']}/10"
     return msg
 
 
@@ -267,8 +259,7 @@ async def now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c = update.effective_chat
-    await update.message.reply_text(f"Chat ID: {c.id}
-Type: {c.type}")
+    await update.message.reply_text(f"Chat ID: {c.id}Type: {c.type}")
 
 
 # -----------------------------
